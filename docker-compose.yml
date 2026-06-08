@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bookcabinet-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookcabinet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bookcabinet-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bookcabinet?schema=public
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bookcabinet-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bookcabinet-seed
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bookcabinet?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: sh -c "npx prisma db seed || npx tsx scripts/seed.ts"
+    networks:
+      - app-network
+    profiles:
+      - seed
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

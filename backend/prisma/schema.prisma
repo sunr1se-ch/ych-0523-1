@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CabinetStatus {
+  available
+  partial
+  full
+  pending_cleanup
+}
+
+model Cabinet {
+  id           Int              @id @default(autoincrement())
+  code         String           @unique @db.VarChar(20)
+  capacity     Int              @default(5)
+  currentCount Int              @default(0) @map("current_count")
+  status       CabinetStatus    @default(available)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  records      BorrowRecord[]
+  cleanups     CleanupRecord[]
+
+  @@map("cabinets")
+}
+
+model BorrowRecord {
+  id                 Int       @id @default(autoincrement())
+  cabinetId          Int       @map("cabinet_id")
+  residentName       String    @map("resident_name") @db.VarChar(100)
+  bookTitle          String    @map("book_title") @db.VarChar(200)
+  borrowDate         DateTime  @map("borrow_date")
+  expectedReturnDate DateTime  @map("expected_return_date")
+  actualReturnDate   DateTime? @map("actual_return_date")
+  wearLevel          Int?      @map("wear_level")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  cabinet            Cabinet   @relation(fields: [cabinetId], references: [id])
+
+  @@map("borrow_records")
+  @@index([cabinetId])
+  @@index([actualReturnDate])
+}
+
+model CleanupRecord {
+  id        Int      @id @default(autoincrement())
+  cabinetId Int      @map("cabinet_id")
+  reason    String   @db.Text
+  operator  String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  cabinet   Cabinet  @relation(fields: [cabinetId], references: [id])
+
+  @@map("cleanup_records")
+  @@index([cabinetId])
+}
