@@ -67,3 +67,41 @@ export const wearLevelLabels: Record<WearLevel, string> = {
   4: '严重磨损，书脊有开裂',
   5: '损坏严重，需下架维修',
 };
+
+export type DraftType = 'borrow' | 'return';
+
+export type DraftSource = 'overview' | 'cabinet-detail' | 'overdue';
+
+export interface BorrowDraft {
+  type: 'borrow';
+  cabinetId: number;
+  residentName: string;
+  bookTitle: string;
+  borrowDate: string;
+  expectedReturnDate: string;
+  source: DraftSource;
+  sourceCabinetId?: number;
+  savedAt: string;
+}
+
+export interface ReturnDraft {
+  type: 'return';
+  recordId: number;
+  actualReturnDate: string;
+  wearLevel: WearLevel;
+  source: DraftSource;
+  sourceCabinetId?: number;
+  savedAt: string;
+}
+
+export type Draft = BorrowDraft | ReturnDraft;
+
+export interface DraftValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+export interface ExpiringSoonInfo {
+  daysUntilDue: number;
+  isExpiringSoon: boolean;
+}

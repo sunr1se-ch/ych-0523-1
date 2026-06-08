@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Eye, CheckCircle, BookOpen } from 'lucide-react';
+import { AlertTriangle, Eye, CheckCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { statusLabels } from '../types';
 import Modal from '../components/Modal';
 import CleanupForm from '../components/CleanupForm';
-import { formatDate } from '../utils/format';
-import { cn } from '../lib/utils';
 
 export default function Cleanup() {
   const navigate = useNavigate();

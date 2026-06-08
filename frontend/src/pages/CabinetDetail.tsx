@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, ArrowDownToLine, AlertTriangle, CheckCircle, BookOpen, XCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { statusLabels } from '../types';
@@ -8,7 +8,9 @@ import Modal from '../components/Modal';
 import BorrowForm from '../components/BorrowForm';
 import ReturnForm from '../components/ReturnForm';
 import CleanupForm from '../components/CleanupForm';
+import { useDraft } from '../hooks/useDraft';
 import { cn } from '../lib/utils';
+import type { Draft } from '../types';
 
 const statusConfig = {
   available: {
@@ -40,16 +42,52 @@ const statusConfig = {
 export default function CabinetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentCabinet, cabinets, fetchCabinet, refreshAll } = useAppStore();
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showCleanupModal, setShowCleanupModal] = useState(false);
+  const [restoreDraft, setRestoreDraft] = useState<Draft | null>(null);
+
+  const cabinetId = id ? Number(id) : undefined;
+
+  const {
+    saveBorrowDraft,
+    saveReturnDraft,
+    clearDraft,
+    getBorrowDraft,
+    getReturnDraft,
+    refreshDrafts,
+  } = useDraft({
+    source: 'cabinet-detail',
+    sourceCabinetId: cabinetId,
+    cabinets,
+    records: currentCabinet?.records || [],
+  });
 
   useEffect(() => {
     if (id) {
       fetchCabinet(Number(id));
     }
   }, [id, fetchCabinet]);
+
+  useEffect(() => {
+    const state = location.state as { restoreDraft?: Draft } | null;
+    if (state?.restoreDraft) {
+      const draft = state.restoreDraft;
+      setRestoreDraft(draft);
+      if (draft.type === 'borrow') {
+        setShowBorrowModal(true);
+      } else {
+        setShowReturnModal(true);
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
+
+  useEffect(() => {
+    refreshDrafts();
+  }, [showBorrowModal, showReturnModal, refreshDrafts]);
 
   if (!currentCabinet) {
     return (
@@ -65,10 +103,27 @@ export default function CabinetDetail() {
   const activeRecords = currentCabinet.records.filter(r => !r.actualReturnDate);
   const canReturn = activeRecords.length > 0;
 
-  const handleSuccess = async () => {
+  const handleBorrowSuccess = async () => {
+    clearDraft('borrow');
+    if (id) await fetchCabinet(Number(id));
+    await refreshAll();
+    setRestoreDraft(null);
+  };
+
+  const handleReturnSuccess = async () => {
+    clearDraft('return');
+    if (id) await fetchCabinet(Number(id));
+    await refreshAll();
+    setRestoreDraft(null);
+  };
+
+  const handleCleanupSuccess = async () => {
     if (id) await fetchCabinet(Number(id));
     await refreshAll();
   };
+
+  const borrowDraft = restoreDraft?.type === 'borrow' ? restoreDraft : getBorrowDraft();
+  const returnDraft = restoreDraft?.type === 'return' ? restoreDraft : getReturnDraft();
 
   return (
     <div className="space-y-6">
@@ -177,26 +232,72 @@ export default function CabinetDetail() {
 
       <Modal
         isOpen={showBorrowModal}
-        onClose={() => setShowBorrowModal(false)}
+        onClose={() => {
+          saveBorrowDraft({
+            cabinetId: '',
+            residentName: '',
+            bookTitle: '',
+            borrowDate: '',
+            expectedReturnDate: '',
+          });
+          setShowBorrowModal(false);
+          setRestoreDraft(null);
+        }}
         title="借书登记"
       >
         <BorrowForm
           cabinets={cabinets}
           preselectedCabinetId={currentCabinet.id}
-          onSuccess={handleSuccess}
-          onClose={() => setShowBorrowModal(false)}
+          onSuccess={handleBorrowSuccess}
+          onClose={() => {
+            saveBorrowDraft({
+              cabinetId: '',
+              residentName: '',
+              bookTitle: '',
+              borrowDate: '',
+              expectedReturnDate: '',
+            });
+            setShowBorrowModal(false);
+            setRestoreDraft(null);
+          }}
+          draft={borrowDraft}
+          onSaveDraft={saveBorrowDraft}
+          onClearDraft={() => clearDraft('borrow')}
+          source="cabinet-detail"
+          sourceCabinetId={cabinetId}
         />
       </Modal>
 
       <Modal
         isOpen={showReturnModal}
-        onClose={() => setShowReturnModal(false)}
+        onClose={() => {
+          saveReturnDraft({
+            recordId: '',
+            actualReturnDate: '',
+            wearLevel: 2,
+          });
+          setShowReturnModal(false);
+          setRestoreDraft(null);
+        }}
         title="还书登记"
       >
         <ReturnForm
           records={currentCabinet.records}
-          onSuccess={handleSuccess}
-          onClose={() => setShowReturnModal(false)}
+          onSuccess={handleReturnSuccess}
+          onClose={() => {
+            saveReturnDraft({
+              recordId: '',
+              actualReturnDate: '',
+              wearLevel: 2,
+            });
+            setShowReturnModal(false);
+            setRestoreDraft(null);
+          }}
+          draft={returnDraft}
+          onSaveDraft={saveReturnDraft}
+          onClearDraft={() => clearDraft('return')}
+          source="cabinet-detail"
+          sourceCabinetId={cabinetId}
         />
       </Modal>
 
@@ -207,7 +308,7 @@ export default function CabinetDetail() {
       >
         <CleanupForm
           cabinet={currentCabinet}
-          onSuccess={handleSuccess}
+          onSuccess={handleCleanupSuccess}
           onClose={() => setShowCleanupModal(false)}
         />
       </Modal>

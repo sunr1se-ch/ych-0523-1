@@ -1,6 +1,9 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { BookOpen, LayoutGrid, AlertTriangle, Clock } from 'lucide-react';
+import { BookOpen, LayoutGrid, AlertTriangle, Clock, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
+import DraftNotice from './DraftNotice';
+import { useAppStore } from '../store/useAppStore';
+import { isExpiringSoon } from '../hooks/useDraft';
 
 const navItems = [
   { path: '/', label: '柜格总览', icon: LayoutGrid },
@@ -10,6 +13,10 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const { activeRecords, overdueRecords } = useAppStore();
+
+  const expiringCount = activeRecords.filter(r => isExpiringSoon(r)).length;
+  const totalAttentionCount = expiringCount + overdueRecords.length;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -27,27 +34,50 @@ export default function Layout() {
                 <p className="text-xs text-gray-500">流转登记系统</p>
               </div>
             </div>
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                      isActive
-                        ? 'bg-[#2D5A27] text-white shadow-md'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-[#2D5A27]'
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            <div className="flex items-center gap-3">
+              {totalAttentionCount > 0 && (
+                <Link
+                  to="/overdue"
+                  className="relative flex items-center gap-2 px-3 py-2 bg-[#FCEFE6] border border-[#F5C9A8] rounded-lg hover:bg-[#F9E4D4] transition-colors"
+                >
+                  <Bell className="w-4 h-4 text-[#E07B39]" />
+                  <span className="text-sm font-medium text-[#E07B39] hidden sm:inline">
+                    待关注
+                  </span>
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E07B39] text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {totalAttentionCount}
+                  </span>
+                </Link>
+              )}
+              <DraftNotice />
+              <nav className="hidden md:flex items-center gap-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  const showBadge = item.path === '/overdue' && totalAttentionCount > 0;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={cn(
+                        'relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                        isActive
+                          ? 'bg-[#2D5A27] text-white shadow-md'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-[#2D5A27]'
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                      {showBadge && (
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#E07B39] text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {totalAttentionCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
           </div>
         </div>
       </header>
@@ -57,17 +87,23 @@ export default function Layout() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const showBadge = item.path === '/overdue' && totalAttentionCount > 0;
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-200 min-w-[60px]',
+                  'relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-200 min-w-[60px]',
                   isActive ? 'text-[#2D5A27]' : 'text-gray-500'
                 )}
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-xs">{item.label}</span>
+                {showBadge && (
+                  <span className="absolute top-1 right-2 w-4 h-4 bg-[#E07B39] text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {totalAttentionCount}
+                  </span>
+                )}
               </Link>
             );
           })}
