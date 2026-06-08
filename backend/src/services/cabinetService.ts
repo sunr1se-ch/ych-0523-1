@@ -27,9 +27,7 @@ export async function getAllCabinets() {
     const hasOverdueBeyondThreshold = cabinet.records.some(r =>
       shouldTriggerCleanup(r.expectedReturnDate, r.actualReturnDate)
     );
-    const status = cabinet.status === CabinetStatus.pending_cleanup
-      ? CabinetStatus.pending_cleanup
-      : determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdueBeyondThreshold);
+    const status = determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdueBeyondThreshold);
 
     return {
       id: cabinet.id,
@@ -58,9 +56,7 @@ export async function getCabinetById(id: number) {
     .filter(r => !r.actualReturnDate)
     .some(r => shouldTriggerCleanup(r.expectedReturnDate, r.actualReturnDate));
 
-  const status = cabinet.status === CabinetStatus.pending_cleanup
-    ? CabinetStatus.pending_cleanup
-    : determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdueBeyondThreshold);
+  const status = determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdueBeyondThreshold);
 
   return {
     id: cabinet.id,
@@ -95,7 +91,12 @@ export async function createBorrowRecord(data: CreateBorrowRequest) {
     throw new Error('柜格不存在');
   }
 
-  if (cabinet.status === CabinetStatus.pending_cleanup) {
+  const hasOverdueBeyondThreshold = cabinet.records.some(r =>
+    shouldTriggerCleanup(r.expectedReturnDate, r.actualReturnDate)
+  );
+  const computedStatus = determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdueBeyondThreshold);
+
+  if (computedStatus === CabinetStatus.pending_cleanup) {
     throw new Error('该柜格处于待清柜状态，禁止借书，请先完成清柜');
   }
 
@@ -169,12 +170,7 @@ export async function returnBook(recordId: number, data: ReturnBookRequest) {
     .filter(r => !r.actualReturnDate)
     .some(r => shouldTriggerCleanup(r.expectedReturnDate, r.actualReturnDate));
 
-  let newStatus = cabinet.status;
-  if (cabinet.status === CabinetStatus.pending_cleanup) {
-    newStatus = CabinetStatus.pending_cleanup;
-  } else {
-    newStatus = determineCabinetStatus(newCount, cabinet.capacity, hasOverdue);
-  }
+  const newStatus = determineCabinetStatus(newCount, cabinet.capacity, hasOverdue);
 
   await prisma.cabinet.update({
     where: { id: cabinet.id },
@@ -212,9 +208,7 @@ export async function cleanupCabinet(cabinetId: number, data: CleanupRequest) {
     shouldTriggerCleanup(r.expectedReturnDate, r.actualReturnDate)
   );
 
-  const newStatus = hasOverdue
-    ? CabinetStatus.pending_cleanup
-    : determineCabinetStatus(cabinet.currentCount, cabinet.capacity, false);
+  const newStatus = determineCabinetStatus(cabinet.currentCount, cabinet.capacity, hasOverdue);
 
   const updatedCabinet = await prisma.cabinet.update({
     where: { id: cabinetId },
@@ -231,6 +225,20 @@ export async function cleanupCabinet(cabinetId: number, data: CleanupRequest) {
     status: newStatus,
     createdAt: updatedCabinet.createdAt,
   };
+}
+
+export async function getAllActiveRecords() {
+  const records = await prisma.borrowRecord.findMany({
+    where: {
+      actualReturnDate: null,
+    },
+    include: {
+      cabinet: true,
+    },
+    orderBy: { borrowDate: 'desc' },
+  });
+
+  return records.map(transformBorrowRecord);
 }
 
 export async function getOverdueRecords() {

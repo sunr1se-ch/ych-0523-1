@@ -8,19 +8,15 @@ import BorrowForm from '../components/BorrowForm';
 import ReturnForm from '../components/ReturnForm';
 
 export default function Overview() {
-  const { stats, cabinets, fetchStats, fetchCabinets, refreshAll } = useAppStore();
+  const { stats, cabinets, activeRecords, fetchStats, fetchCabinets, fetchActiveRecords, refreshAll } = useAppStore();
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
 
   useEffect(() => {
     fetchStats();
     fetchCabinets();
-  }, [fetchStats, fetchCabinets]);
-
-  const allRecords = cabinets.flatMap(c => {
-    const records = useAppStore.getState().currentCabinet?.records || [];
-    return records.filter(r => r.cabinetId === c.id && !r.actualReturnDate);
-  });
+    fetchActiveRecords();
+  }, [fetchStats, fetchCabinets, fetchActiveRecords]);
 
   return (
     <div className="space-y-6">
@@ -128,7 +124,7 @@ export default function Overview() {
         title="还书登记"
       >
         <ReturnForm
-          records={allRecords.length > 0 ? allRecords : (useAppStore.getState().overdueRecords)}
+          records={activeRecords}
           onSuccess={refreshAll}
           onClose={() => setShowReturnModal(false)}
         />

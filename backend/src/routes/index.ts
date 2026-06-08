@@ -6,6 +6,7 @@ import {
   createBorrowRecord,
   returnBook,
   cleanupCabinet,
+  getAllActiveRecords,
   getOverdueRecords,
   getPendingCleanupCabinets,
   getStats,
@@ -99,6 +100,15 @@ router.post('/cleanup/:id', async (req, res, next) => {
     }
     const cabinet = await cleanupCabinet(id, data);
     res.json(cabinet);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/active-records', async (_req, res, next) => {
+  try {
+    const records = await getAllActiveRecords();
+    res.json(records);
   } catch (err) {
     next(err);
   }

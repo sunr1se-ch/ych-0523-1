@@ -6,6 +6,7 @@ interface AppState {
   stats: Stats | null;
   cabinets: Cabinet[];
   currentCabinet: CabinetDetail | null;
+  activeRecords: BorrowRecord[];
   overdueRecords: BorrowRecord[];
   pendingCleanup: Cabinet[];
   loading: boolean;
@@ -13,6 +14,7 @@ interface AppState {
   fetchStats: () => Promise<void>;
   fetchCabinets: () => Promise<void>;
   fetchCabinet: (id: number) => Promise<void>;
+  fetchActiveRecords: () => Promise<void>;
   fetchOverdue: () => Promise<void>;
   fetchPendingCleanup: () => Promise<void>;
   refreshAll: () => Promise<void>;
@@ -23,6 +25,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   stats: null,
   cabinets: [],
   currentCabinet: null,
+  activeRecords: [],
   overdueRecords: [],
   pendingCleanup: [],
   loading: false,
@@ -61,6 +64,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  fetchActiveRecords: async () => {
+    set({ loading: true });
+    try {
+      const records = await apiService.getActiveRecords();
+      set({ activeRecords: records });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : '获取借阅记录失败' });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
   fetchOverdue: async () => {
     set({ loading: true });
     try {
@@ -86,10 +101,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshAll: async () => {
-    const { fetchStats, fetchCabinets, fetchOverdue, fetchPendingCleanup } = get();
+    const { fetchStats, fetchCabinets, fetchActiveRecords, fetchOverdue, fetchPendingCleanup } = get();
     await Promise.all([
       fetchStats(),
       fetchCabinets(),
+      fetchActiveRecords(),
       fetchOverdue(),
       fetchPendingCleanup(),
     ]);
